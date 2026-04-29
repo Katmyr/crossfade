@@ -314,15 +314,61 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;heigh
 
 <script>
 const COLORS = ['#a060ff','#60c0ff','#7fff00','#ff6060','#ff9f40','#ff60c0','#40e0d0','#ffd700'];
+
+// ── LocalStorage ──────────────────────────────────────────────────────────────
+const LS_KEY = 'crossfade_v1';
+function saveState() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      p: S.p, artists: S.artists,
+      playlist: S.playlist, likedIds: [...S.likedIds],
+    }));
+  } catch(e) {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.p) S.p = d.p;
+    if (d.artists) S.artists = d.artists;
+    if (d.playlist) S.playlist = d.playlist;
+    if (d.likedIds) S.likedIds = new Set(d.likedIds);
+  } catch(e) {}
+}
+
 const S = {
   p: [{name:'Joueur 1',ci:0,pic:''},{name:'Joueur 2',ci:2,pic:''}],
   artists: [],
   deck: [], cur: 0, history: [],
   votes: [null,null], resolving: false,
-  playlist: [], // {track, doublelike}
+  playlist: [],
   paused: false,
-  likedIds: new Set(), // FIX: track liked song IDs to avoid re-proposing
+  likedIds: new Set(),
 };
+loadState(); // restore persisted state
+
+// ── Restore UI from persisted state ──────────────────────────────────────────
+function restoreUI() {
+  // Player names
+  if (S.p[0].name && S.p[0].name !== 'Joueur 1') document.getElementById('name0').value = S.p[0].name;
+  if (S.p[1].name && S.p[1].name !== 'Joueur 2') document.getElementById('name1').value = S.p[1].name;
+  // Colors + avatars
+  [0,1].forEach(i => {
+    const ci = S.p[i].ci;
+    document.getElementById('av'+i).className = 'player-avatar c'+ci;
+    document.getElementById('arr'+i+'l').className = 'color-arrow cv'+ci;
+    document.getElementById('arr'+i+'r').className = 'color-arrow cv'+ci;
+    if (S.p[i].pic) {
+      const imgEl = document.getElementById('av'+i+'-img');
+      imgEl.src = S.p[i].pic; imgEl.style.display = 'block';
+    }
+  });
+  // Artists grid
+  if (S.artists.length) renderGrid();
+  // Matches tab
+  if (S.playlist.length) refreshMatches();
+}
 
 // ── Wire all buttons ──────────────────────────────────────────────────────────
 document.getElementById('arr0l').addEventListener('click', () => changeColor(0,-1));
@@ -356,6 +402,9 @@ document.getElementById('matches-list').addEventListener('click', e => {
   if (del) { removeMatch(parseInt(del.dataset.idx)); return; }
 });
 
+// Restore UI once buttons are wired
+restoreUI();
+
 // Search results event delegation
 document.getElementById('search-modal-results').addEventListener('click', e => {
   const item = e.target.closest('.result-item');
@@ -370,6 +419,7 @@ function changeColor(pi, dir) {
   document.getElementById('av'+pi).className = 'player-avatar c'+ci;
   document.getElementById('arr'+pi+'l').className = 'color-arrow cv'+ci;
   document.getElementById('arr'+pi+'r').className = 'color-arrow cv'+ci;
+  saveState();
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -421,6 +471,7 @@ function pickArtist(id, name, pic) {
   if (S.artists.find(a=>a.id===id)) { closeSearch(); return; }
   if (S.artists.length>=12) { closeSearch(); return; }
   S.artists.push({id, name, pic});
+  saveState();
   // Show last added artist photo on a player avatar (alternate between p0/p1)
   const pi = S.artists.length <= 1 ? 0 : 1;
   if (pic && S.artists.length <= 2) {
@@ -434,6 +485,7 @@ function pickArtist(id, name, pic) {
 
 function removeArtist(id) {
   S.artists = S.artists.filter(a=>a.id!==id);
+  saveState();
   renderGrid();
 }
 
@@ -457,6 +509,7 @@ function renderGrid() {
 async function startGame() {
   S.p[0].name = document.getElementById('name0').value.trim()||'Joueur 1';
   S.p[1].name = document.getElementById('name1').value.trim()||'Joueur 2';
+  saveState();
   const err = document.getElementById('err-msg');
   if (!S.artists.length) { err.textContent='Ajoute au moins un artiste.'; err.style.display='block'; return; }
   err.style.display = 'none';
@@ -587,6 +640,7 @@ function nextTrack(add, dl) {
     const t=S.deck[S.cur];
     S.likedIds.add(t.id); // FIX: mark as liked so it never repeats
     S.playlist.push({track:t,doublelike:dl});
+    saveState();
     if(dl) spawnConfetti();
     refreshMatches();
   }
@@ -600,6 +654,7 @@ function backToSetup(){stopAudio();showScreen('setup');}
 // ── Matches ───────────────────────────────────────────────────────────────────
 function removeMatch(idx) {
   S.playlist.splice(idx, 1);
+  saveState();
   if (mpCurrentIdx===idx) mpStop();
   else if (mpCurrentIdx>idx) mpCurrentIdx--;
   refreshMatches();
