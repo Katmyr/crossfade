@@ -346,29 +346,10 @@ const S = {
   paused: false,
   likedIds: new Set(),
 };
-loadState(); // restore persisted state
 
-// ── Restore UI from persisted state ──────────────────────────────────────────
-function restoreUI() {
-  // Player names
-  if (S.p[0].name && S.p[0].name !== 'Joueur 1') document.getElementById('name0').value = S.p[0].name;
-  if (S.p[1].name && S.p[1].name !== 'Joueur 2') document.getElementById('name1').value = S.p[1].name;
-  // Colors + avatars
-  [0,1].forEach(i => {
-    const ci = S.p[i].ci;
-    document.getElementById('av'+i).className = 'player-avatar c'+ci;
-    document.getElementById('arr'+i+'l').className = 'color-arrow cv'+ci;
-    document.getElementById('arr'+i+'r').className = 'color-arrow cv'+ci;
-    if (S.p[i].pic) {
-      const imgEl = document.getElementById('av'+i+'-img');
-      imgEl.src = S.p[i].pic; imgEl.style.display = 'block';
-    }
-  });
-  // Artists grid
-  if (S.artists.length) renderGrid();
-  // Matches tab
-  if (S.playlist.length) refreshMatches();
-}
+// ── Audio state ─────────────────────────────────────────────────────────────────
+let aud=null, pTmr=null, pEl=0;
+let mpAud=null, mpTmr=null, mpEl=0, mpCurrentIdx=-1, mpAudPaused=false;
 
 // ── Wire all buttons ──────────────────────────────────────────────────────────
 document.getElementById('arr0l').addEventListener('click', () => changeColor(0,-1));
@@ -401,9 +382,6 @@ document.getElementById('matches-list').addEventListener('click', e => {
   if (wrap) { mpPlayTrack(wrap.dataset.idx); return; }
   if (del) { removeMatch(parseInt(del.dataset.idx)); return; }
 });
-
-// Restore UI once buttons are wired
-restoreUI();
 
 // Search results event delegation
 document.getElementById('search-modal-results').addEventListener('click', e => {
@@ -556,7 +534,6 @@ async function loadTracks() {
 }
 
 // ── Game audio ────────────────────────────────────────────────────────────────
-let aud=null, pTmr=null, pEl=0;
 
 function stopAudio() {
   if(aud){aud.pause();aud=null;}
@@ -686,7 +663,6 @@ function refreshMatches() {
 }
 
 // ── Matches mini-player ───────────────────────────────────────────────────────
-let mpAud=null, mpTmr=null, mpEl=0, mpCurrentIdx=-1, mpAudPaused=false;
 
 function mpPlayTrack(idxStr) {
   const idx=parseInt(idxStr);
@@ -749,6 +725,24 @@ function showScreen(n){
 }
 function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;}
 function spawnConfetti(){const w=document.getElementById('confetti');const c=['#7fff00','#a060ff','#60c0ff','#fff','#ffd700'];for(let i=0;i<60;i++)setTimeout(()=>{const el=document.createElement('div');el.className='cp';const sz=5+Math.random()*7;el.style.cssText=`left:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:${c[Math.floor(Math.random()*c.length)]};border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${1.8+Math.random()*2}s;`;w.appendChild(el);setTimeout(()=>el.remove(),4500);},i*30);}
+
+// ── Init: load persisted state then restore UI ────────────────────────────────
+// Called at end so all functions are defined
+loadState();
+[0,1].forEach(i => {
+  const ci = S.p[i].ci;
+  document.getElementById('av'+i).className = 'player-avatar c'+ci;
+  document.getElementById('arr'+i+'l').className = 'color-arrow cv'+ci;
+  document.getElementById('arr'+i+'r').className = 'color-arrow cv'+ci;
+  if (S.p[i].pic) {
+    const imgEl = document.getElementById('av'+i+'-img');
+    imgEl.src = S.p[i].pic; imgEl.style.display = 'block';
+  }
+});
+if (S.p[0].name && S.p[0].name !== 'Joueur 1') document.getElementById('name0').value = S.p[0].name;
+if (S.p[1].name && S.p[1].name !== 'Joueur 2') document.getElementById('name1').value = S.p[1].name;
+if (S.artists.length) renderGrid();
+if (S.playlist.length) refreshMatches();
 </script>
 </body>
 </html>
